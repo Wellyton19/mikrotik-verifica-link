@@ -1,0 +1,35 @@
+:local ip1 "8.8.8.8"
+:local ip2 "200.160.2.3"
+:local ip3 "157.240.222.35"
+:local interfaceName "sfp11"
+:local ruleComment "Rota_Default_VIVO_102"
+:local srcAddress "10.255.255.201"
+
+:local pingResult1 [/ping $ip1 interface=$interfaceName count=3 src-address=$srcAddress]
+:local pingResult2 [/ping $ip2 interface=$interfaceName count=3 src-address=$srcAddress]
+:local pingResult3 [/ping $ip3 interface=$interfaceName count=3 src-address=$srcAddress]
+
+# Obter o status atual da regra de roteamento
+:local ruleStatus [/ip route get [find comment=$ruleComment] disabled]
+
+# Contar quantos IPs est�o inacess�veis
+:local unreachableCount 0
+:if ($pingResult1 = 0) do={ :set unreachableCount ($unreachableCount + 1) }
+:if ($pingResult2 = 0) do={ :set unreachableCount ($unreachableCount + 1) }
+:if ($pingResult3 = 0) do={ :set unreachableCount ($unreachableCount + 1) }
+
+:if ($unreachableCount >= 2) do={
+    # Desabilitar a regra de roteamento apenas se estiver habilitada
+    :if ($ruleStatus = false) do={
+        /ip route disable [find comment=$ruleComment]
+        :log info "Pelo menos dois dos IPs ($ip1, $ip2, $ip3) s�o inacess�veis pela Vivo 102. A regra de ip route foi desabilitada."
+        /tool fetch url=("http://172.31.255.2/Envio_Mens_mikrotik_whatt/index.php?phone=556799673621&msg=Regra_Ip_Route_Vivo_102_Desabilitada") mode=http
+    }
+} else={
+    # Habilitar a regra de roteamento apenas se estiver desabilitada
+    :if ($ruleStatus = true) do={
+        /ip route enable [find comment=$ruleComment]
+        :log info "Todos os IPs ($ip1, $ip2, $ip3) s�o alcan��veis pela Vivo 102. A regra de ip route foi habilitada."
+        /tool fetch url=("http://172.31.255.2/Envio_Mens_mikrotik_whatt/index.php?phone=556799673621&msg=Regra_Ip_Route_Vivo_102_Habilitada") mode=http
+    }
+}
