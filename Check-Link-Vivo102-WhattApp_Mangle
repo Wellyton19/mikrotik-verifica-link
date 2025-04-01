@@ -1,0 +1,39 @@
+:local ip1 "8.8.8.8"
+:local ip2 "200.160.2.3" 
+:local ip3 "157.240.222.35"
+:local interfaceName "sfp11"
+:local ruleComment "Vivo-102"
+:local srcAddress "10.255.255.201"
+
+:local pingResult1 [/ping $ip1 interface=$interfaceName count=3 src-address=$srcAddress]
+:local pingResult2 [/ping $ip2 interface=$interfaceName count=3 src-address=$srcAddress]
+:local pingResult3 [/ping $ip3 interface=$interfaceName count=3 src-address=$srcAddress]
+
+# Obter o status atual da regra
+:local ruleStatus [/ip firewall mangle get [find comment=$ruleComment] disabled]
+
+# Contar quantos IPs est�o inacess�veis
+:local unreachableCount 0
+:if ($pingResult1 = 0) do={ :set unreachableCount ($unreachableCount + 1) }
+:if ($pingResult2 = 0) do={ :set unreachableCount ($unreachableCount + 1) }
+:if ($pingResult3 = 0) do={ :set unreachableCount ($unreachableCount + 1) }
+
+:if ($unreachableCount >= 2) do={
+  # Desabilitar a regra apenas se estiver habilitada
+  :if ($ruleStatus = false) do={
+    /ip firewall mangle disable [find comment=$ruleComment]
+    :local message "Regra+Mangle+Vivo+102+desabilitada"
+    :log info "Pelo menos dois dos IPs ($ip1, $ip2, $ip3) s�o inacess�veis pela Vivo 102. A regra de mangle foi desabilitada."
+    # Enviar mensagem quando a regra � desabilitada
+    /tool fetch url=("http://172.31.255.2/Envio_Mens_mikrotik_whatt/index.php?msg=Regra_Mangle_Vivo_102_desabilitada&phone=556799673621") mode=http
+  }
+} else={
+  # Habilitar a regra apenas se estiver desabilitada
+  :if ($ruleStatus = true) do={
+    /ip firewall mangle enable [find comment=$ruleComment]
+    :local message "Regra+Mangle+Vivo+102+habilitada"
+    :log info "Todos os IPs ($ip1, $ip2, $ip3) s�o alcan��veis pela Vivo 102. A regra de mangle foi habilitada."
+    # Enviar mensagem quando a regra � habilitada
+    /tool fetch url=("http://172.31.255.2/Envio_Mens_mikrotik_whatt/index.php?msg=Regra_Mangle_Vivo_102_Habilitada&phone=556799673621") mode=http
+  }
+}
